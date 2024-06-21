@@ -1,6 +1,8 @@
 from django.db import models
+from rest_framework.generics import get_object_or_404
 
 from book.models import Book
+from borrowing.management.commands.send_notification import notification
 from library_service import settings
 
 
@@ -25,3 +27,16 @@ class Borrowing(models.Model):
 
     def __str__(self):
         return f"{self.book.title} borrowed by {self.user}"
+
+    def save(self, *args, **kwargs):
+        book = get_object_or_404(Book, pk=self.book.id)
+        message = (
+            f"You have borrowed the book:\n'{book.title}'."
+            f"\nExpected return date:"
+            f"\n{self.expected_return_date}\n"
+            f"Rental fee per day:\n"
+            f"{book.daily_fee} $"
+        )
+        if self.pk is None:
+            notification(message)
+        super().save(*args, **kwargs)
