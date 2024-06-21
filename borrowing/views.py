@@ -1,4 +1,9 @@
+from datetime import datetime
+
+from django.db import transaction
 from rest_framework import mixins
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from borrowing.models import Borrowing
@@ -7,6 +12,7 @@ from borrowing.serializers import (
     BorrowingCreateSerializer,
     BorrowingListSerializer,
     BorrowingDetailSerializer,
+    BorrowingReturnBookSerializer,
 )
 
 
@@ -59,4 +65,27 @@ class BorrowingViewSet(
             return BorrowingDetailSerializer
         if self.action == "create":
             return BorrowingCreateSerializer
+        if self.action == "return_book":
+            return BorrowingReturnBookSerializer
         return self.serializer_class
+
+    @transaction.atomic
+    @action(
+        methods=["PATCH"],
+        detail=True,
+        url_path="return-book",
+        serializer_class=BorrowingReturnBookSerializer,
+    )
+    def return_book(self, request, pk=None):
+        borrowing = self.get_object()
+        actual_return_date = datetime.now().date()
+
+        serializer_update = BorrowingReturnBookSerializer(
+            borrowing,
+            context={"request": self.request},
+            data={"actual_return_date": actual_return_date},
+            partial=True,
+        )
+        serializer_update.is_valid(raise_exception=True)
+        serializer_update.save()
+        return Response({"status": "book returned"})

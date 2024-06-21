@@ -1,5 +1,8 @@
+from datetime import datetime
+
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from borrowing.models import Borrowing
 from book.serializers import BookSerializer
@@ -69,3 +72,23 @@ class BorrowingDetailSerializer(BorrowingListSerializer):
             "book",
             "user"
         )
+
+
+class BorrowingReturnBookSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Borrowing
+        fields = (
+            "id",
+            "borrow_date",
+            "expected_return_date",
+            "actual_return_date"
+        )
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        book = instance.book
+        instance.actual_return_date = datetime.now().date()
+        instance.save()
+        book.inventory += 1
+        book.save()
+        return instance
