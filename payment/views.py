@@ -1,6 +1,7 @@
 import stripe
 
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status, generics, viewsets
@@ -34,6 +35,11 @@ class PaymentViewSet(
             return PaymentDetailSerializer
         return PaymentSerializer
 
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def get_queryset(self):
         if self.request.user.is_staff:
             return super().get_queryset()
@@ -44,6 +50,7 @@ class PaymentViewSet(
         detail=False,
         url_path="payment-success",
         url_name="success",
+        permission_classes=[AllowAny],
     )
     def payment_success(self, request: Request):
         session_id = request.query_params.get("session_id")
@@ -68,6 +75,7 @@ class PaymentViewSet(
         detail=False,
         url_path="payment-cancel",
         url_name="cancel",
+        permission_classes=[AllowAny],
     )
     def payment_cancel(self, request: Request):
         session_id = request.query_params.get("session_id")
@@ -84,6 +92,7 @@ class PaymentViewSet(
         detail=True,
         url_path="recreate-session",
         url_name="recreate",
+        permission_classes=[AllowAny],
     )
     def recreate_payment_session(self, request, pk=None):
         payment = self.get_object()
