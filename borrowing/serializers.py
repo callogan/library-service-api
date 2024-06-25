@@ -27,6 +27,14 @@ class BorrowingCreateSerializer(serializers.ModelSerializer):
         model = Borrowing
         fields = ("id", "borrow_date", "expected_return_date", "book", "user")
 
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        Borrowing.validate_inventory(
+            attrs["book"],
+            ValidationError
+        )
+        return data
+
     @transaction.atomic()
     def create(self, validated_data):
         borrowing = Borrowing.objects.create(**validated_data)
@@ -83,6 +91,12 @@ class BorrowingReturnBookSerializer(serializers.ModelSerializer):
             "expected_return_date",
             "actual_return_date"
         )
+
+    def validate(self, attrs):
+        borrowing = self.instance
+        if borrowing.actual_return_date is not None:
+            raise ValidationError(detail="Book has been already returned.")
+        return super().validate(attrs=attrs)
 
     @transaction.atomic
     def update(self, instance, validated_data):

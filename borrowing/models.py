@@ -40,3 +40,8 @@ class Borrowing(models.Model):
         if self.pk is None:
             notification(message)
         super().save(*args, **kwargs)
+
+    @staticmethod
+    def validate_inventory(book, error_to_raise):
+        if book.inventory < 1:
+            raise error_to_raise("There are no books in inventory to borrow.")
