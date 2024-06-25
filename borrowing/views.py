@@ -14,6 +14,7 @@ from borrowing.serializers import (
     BorrowingDetailSerializer,
     BorrowingReturnBookSerializer,
 )
+from borrowing.tasks import overdue_borrowing_notifications
 
 
 class BorrowingViewSet(
@@ -25,6 +26,11 @@ class BorrowingViewSet(
 ):
     queryset = Borrowing.objects.all()
     serializer_class = BorrowingSerializer
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        overdue_borrowing_notifications.delay()
+        return response
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
