@@ -15,6 +15,7 @@ from payment.serializers import (
     PaymentListSerializer,
     PaymentDetailSerializer,
 )
+from payment.tasks import check_stripe_expired_payments
 
 
 class PaymentViewSet(
@@ -87,6 +88,8 @@ class PaymentViewSet(
     def recreate_payment_session(self, request, pk=None):
         payment = self.get_object()
         borrowing = payment.borrowing
+
+        check_stripe_expired_payments.delay()
 
         if payment.status == "EXPIRED":
             new_payment_session = create_stripe_session(
