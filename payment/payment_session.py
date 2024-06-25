@@ -6,6 +6,7 @@ from rest_framework.request import Request
 from rest_framework.reverse import reverse
 from stripe.checkout import Session
 
+from borrowing.management.commands.send_notification import notification
 from borrowing.models import Borrowing
 from payment.models import Payment
 
@@ -90,3 +91,9 @@ def create_stripe_session(borrowing: Borrowing, request: Request) -> Session:
     )
 
     return session
+
+
+def send_payment_notification(payment):
+    message = f"You have successfully paid {payment.money_to_pay}$\n" \
+              f"Your borrowing ID: {payment.borrowing.id}"
+    notification(message)

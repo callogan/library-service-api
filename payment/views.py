@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status, generics, viewsets
 
 from payment.models import Payment
+from payment.payment_session import send_payment_notification
 from payment.serializers import (
     PaymentSerializer,
     PaymentListSerializer,
@@ -52,6 +53,8 @@ class PaymentViewSet(
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
+
+            send_payment_notification(payment)
 
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(status=status.HTTP_400_BAD_REQUEST)
