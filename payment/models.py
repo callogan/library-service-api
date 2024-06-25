@@ -7,7 +7,8 @@ from borrowing.models import Borrowing
 class Payment(models.Model):
     STATUS_CHOICE = [
         ("PENDING", "Pending"),
-        ("PAID", "Paid")
+        ("PAID", "Paid"),
+        ("EXPIRED", "Expired")
     ]
 
     status = models.CharField(
@@ -39,6 +40,7 @@ class Payment(models.Model):
         blank=True,
         validators=[MinValueValidator(0)]
     )
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
         return f"{self.status} ({self.money_to_pay}USD)"

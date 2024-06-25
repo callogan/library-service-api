@@ -6,11 +6,14 @@ from rest_framework.response import Response
 from rest_framework import status, generics, viewsets
 
 from payment.models import Payment
-from payment.payment_session import send_payment_notification
+from payment.payment_session import (
+    create_stripe_session,
+    send_payment_notification,
+)
 from payment.serializers import (
     PaymentSerializer,
     PaymentListSerializer,
-    PaymentDetailSerializer
+    PaymentDetailSerializer,
 )
 
 
@@ -74,3 +77,28 @@ class PaymentViewSet(
             **serializer.data
         }
         return Response(data=data, status=status.HTTP_200_OK)
+
+    @action(
+        methods=["POST"],
+        detail=True,
+        url_path="recreate-session",
+        url_name="recreate",
+    )
+    def recreate_payment_session(self, request, pk=None):
+        payment = self.get_object()
+        borrowing = payment.borrowing
+
+        if payment.status == "EXPIRED":
+            new_payment_session = create_stripe_session(
+                borrowing=borrowing, request=self.request
+            )
+
+            payment.status = "PENDING"
+            payment.session_id = new_payment_session.id
+            payment.session_url = new_payment_session.url
+
+            payment.save()
+
+            return Response({"status": "Session has been recreated"})
+
+        return Response({"status": "Session is still active"})

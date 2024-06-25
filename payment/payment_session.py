@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import os
 import stripe
+import time
+
+from datetime import datetime, timedelta
 from rest_framework.request import Request
 from rest_framework.reverse import reverse
 from stripe.checkout import Session
@@ -42,6 +45,7 @@ def create_payment(borrowing: Borrowing, request: Request) -> Payment | None:
     payment.session_id = stripe_session.id
     payment.session_url = stripe_session.url
     payment.money_to_pay = stripe_session.amount_total / 100
+    payment.expires_at = datetime.fromtimestamp(stripe_session.expires_at)
 
     payment.save()
 
@@ -87,7 +91,11 @@ def create_stripe_session(borrowing: Borrowing, request: Request) -> Session:
         ],
         mode="payment",
         success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url=cancel_url + "?session_id={CHECKOUT_SESSION_ID}"
+        cancel_url=cancel_url + "?session_id={CHECKOUT_SESSION_ID}",
+        expires_at=int(time.mktime((
+            datetime.now() + timedelta(hours=16)
+        ).timetuple()))
+
     )
 
     return session
