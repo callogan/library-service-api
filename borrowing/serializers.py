@@ -30,10 +30,12 @@ class BorrowingCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         data = super().validate(attrs)
+        user = self.context["request"].user
         Borrowing.validate_inventory(
             attrs["book"],
             ValidationError
         )
+        Borrowing.validate_pending_borrowings(user, ValidationError)
         return data
 
     @transaction.atomic()

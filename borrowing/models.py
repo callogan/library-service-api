@@ -28,6 +28,19 @@ class Borrowing(models.Model):
     def __str__(self):
         return f"{self.book.title} borrowed by {self.user}"
 
+    @staticmethod
+    def validate_inventory(book, error_to_raise):
+        if book.inventory < 1:
+            raise error_to_raise("There are no books in inventory to borrow.")
+
+    @staticmethod
+    def validate_pending_borrowings(user, error_to_raise):
+        pending_borrowings = user.borrowings.filter(payments__status="PENDING")
+
+        if pending_borrowings:
+            raise error_to_raise("You have not yet completed your paying. "
+                                 "Please complete it before borrowing a new book.")
+
     def save(self, *args, **kwargs):
         book = get_object_or_404(Book, pk=self.book.id)
         message = (
@@ -40,8 +53,3 @@ class Borrowing(models.Model):
         if self.pk is None:
             notification(message)
         super().save(*args, **kwargs)
-
-    @staticmethod
-    def validate_inventory(book, error_to_raise):
-        if book.inventory < 1:
-            raise error_to_raise("There are no books in inventory to borrow.")
