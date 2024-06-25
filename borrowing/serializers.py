@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 
 from borrowing.models import Borrowing
 from book.serializers import BookSerializer
+from payment.payment_session import create_payment
 
 
 class BorrowingSerializer(serializers.ModelSerializer):
@@ -105,4 +106,9 @@ class BorrowingReturnBookSerializer(serializers.ModelSerializer):
         instance.save()
         book.inventory += 1
         book.save()
+
+        request = self.context.get("request")
+        borrowing = instance
+        create_payment(borrowing, request)
+
         return instance
