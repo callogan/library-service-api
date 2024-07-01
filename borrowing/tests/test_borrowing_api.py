@@ -1,3 +1,5 @@
+import stripe
+
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
@@ -14,8 +16,9 @@ from borrowing.models import Borrowing
 from borrowing.serializers import (
     BorrowingSerializer,
     BorrowingListSerializer,
-    BorrowingDetailSerializer
+    BorrowingDetailSerializer,
 )
+from payment.models import Payment
 
 BORROWING_URL = reverse("borrowing:borrowing-list")
 
@@ -57,7 +60,7 @@ def return_url(borrowing_id):
 
 
 class UnauthenticatedBorrowingApiTests(APITestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = APIClient()
 
     def test_auth_required(self):
@@ -66,7 +69,7 @@ class UnauthenticatedBorrowingApiTests(APITestCase):
 
 
 class AuthenticatedBorrowingApiTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = APIClient()
         self.user_1 = get_user_model().objects.create_user(
             "test1@test.com",
@@ -169,7 +172,7 @@ class AuthenticatedBorrowingApiTests(TestCase):
 
     @patch("celery.app.task.Task.delay", return_value=1)
     @patch("celery.app.task.Task.apply_async", return_value=1)
-    def test_borrowing_create(self, *args, **kwargs):
+    def test_create_borrowing(self, *args, **kwargs):
         payload = {
             "expected_return_date": datetime.now().date() + timedelta(days=10),
             "book": self.book_1.id,
@@ -186,6 +189,53 @@ class AuthenticatedBorrowingApiTests(TestCase):
 
         self.assertEquals(resp.status_code, status.HTTP_201_CREATED)
         self.assertEquals(self.book_1.inventory, 1)
+
+    def test_borrowing_create_not_allowed_if_previous_not_payed(self):
+        payment = Payment.objects.create(
+            borrowing=self.borrowing_1
+        )
+
+        price_data = stripe.Price.create(
+            unit_amount=1200,
+            currency="usd",
+            product_data={
+                "name": f"Payment for borrowing of {self.book_1.title}",
+            }
+        )
+        stripe_session = stripe.checkout.Session.create(
+            line_items=[
+                {
+                    "price": price_data.id,
+                    "quantity": 1
+                }
+            ],
+            mode="payment",
+            success_url="http://localhost:8000/success/",
+            cancel_url="http://localhost:8000/cancel/"
+        )
+
+        payment.session_id = stripe_session.id
+        payment.session_url = stripe_session.url
+        payment.money_to_pay = stripe_session.amount_total
+        payment.expires_at = datetime.fromtimestamp(stripe_session.expires_at)
+
+        payment.save()
+
+        book = self.book_1
+        payload = {
+            "expected_return_date": datetime.now().date() + timedelta(days=30),
+            "book": book.id,
+            "user": self.user_1.id
+        }
+
+        resp = self.client.post(BORROWING_URL, payload)
+
+        self.assertEquals(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEquals(
+            resp.data["non_field_errors"][0],
+            "You have not yet completed your paying. "
+            "Please complete it before borrowing a new book."
+        )
 
     def test_borrowing_create_not_allowed_if_zero_inventory(self):
         book = self.book_1
@@ -221,7 +271,7 @@ class AuthenticatedBorrowingApiTests(TestCase):
             "There are no books in inventory to borrow."
         )
 
-    def test_book_return(self):
+    def test_return_book(self):
         borrowing = self.borrowing_1
 
         url = detail_url(borrowing.id) + "return-book/"
@@ -235,6 +285,40 @@ class AuthenticatedBorrowingApiTests(TestCase):
             resp_2.data["non_field_errors"][0],
             "Book has been already returned."
         )
+
+    def test_create_payment(self):
+        borrowing = Borrowing.objects.create(
+            expected_return_date=datetime.now().date() - timedelta(days=15),
+            book=self.book_1,
+            user=self.user_1
+        )
+
+        borrowing.borrow_date = datetime.now().date() - timedelta(days=20)
+
+        borrowing.save()
+
+        url = detail_url(borrowing.id) + "return-book/"
+
+        self.client.patch(url)
+
+        borrowing.actual_return_date = datetime.now().date()
+
+        borrowing_period = (
+            borrowing.expected_return_date - borrowing.borrow_date
+        ).days
+        overdue_period = (
+            borrowing.actual_return_date - borrowing.expected_return_date
+        ).days
+        borrowing_amount = int(self.book_1.daily_fee * borrowing_period * 100)
+        overdue_amount = int(self.book_1.daily_fee * 2 * overdue_period * 100)
+        calculated_total_amount = borrowing_amount + overdue_amount
+
+        payments = borrowing.payments.filter(status="PENDING")
+
+        self.assertTrue(payments.exists())
+        self.assertEqual(payments.count(), 1)
+        payment = payments.first()
+        self.assertEqual(payment.money_to_pay, calculated_total_amount / 100)
 
     def test_filter_borrowings_is_active_true_or_false(self):
         borrowing_1 = Borrowing.objects.create(
@@ -275,7 +359,7 @@ class AuthenticatedBorrowingApiTests(TestCase):
 
 
 class AdminBorrowingApiTests(APITestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = APIClient()
         self.user_1 = get_user_model().objects.create_user(
             "admin@admin.com", "testpass1", is_staff=True
