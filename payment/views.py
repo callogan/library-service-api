@@ -53,6 +53,7 @@ class PaymentViewSet(
         permission_classes=[AllowAny],
     )
     def payment_success(self, request: Request):
+        """Endpoint for successful payment session"""
         session_id = request.query_params.get("session_id")
         payment = Payment.objects.get(session_id=session_id)
 
@@ -78,6 +79,7 @@ class PaymentViewSet(
         permission_classes=[AllowAny],
     )
     def payment_cancel(self, request: Request):
+        """Endpoint for canceled payment session"""
         session_id = request.query_params.get("session_id")
         payment = Payment.objects.get(session_id=session_id)
         serializer = PaymentSerializer(payment)
@@ -95,6 +97,10 @@ class PaymentViewSet(
         permission_classes=[AllowAny],
     )
     def recreate_payment_session(self, request, pk=None):
+        """
+        Endpoint for creating new payment session
+        in the case current one has expired
+        """
         payment = self.get_object()
         borrowing = payment.borrowing
 

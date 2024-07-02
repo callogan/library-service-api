@@ -39,6 +39,7 @@ class BorrowingViewSet(
 
     @staticmethod
     def _params_to_ints(qs):
+        """Converts a list of string IDs to a list of integers"""
         return [int(str_id) for str_id in qs.split(",")]
 
     def get_queryset(self):
@@ -85,6 +86,7 @@ class BorrowingViewSet(
         serializer_class=BorrowingReturnBookSerializer,
     )
     def return_book(self, request, pk=None):
+        """Endpoint for returning borrowed book"""
         borrowing = self.get_object()
         actual_return_date = datetime.now().date()
 
