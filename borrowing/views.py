@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from django.db import transaction
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import mixins
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -99,3 +100,24 @@ class BorrowingViewSet(
         serializer_update.is_valid(raise_exception=True)
         serializer_update.save()
         return Response({"status": "book returned"})
+
+    # For documentation purposes only
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "is active",
+                type={"type": "string"},
+                description="Filter borrowings by actual_return_date "
+                            "(if it's None - borrowing is still active). "
+                            "ex. /?is_active=True",
+            ),
+            OpenApiParameter(
+                "user",
+                type={"type": "list", "items": {"type": "number"}},
+                description="Filter borrowings by user ids. For admin only. "
+                            "(ex. /?user=1,2)",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
