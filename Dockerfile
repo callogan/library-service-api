@@ -26,5 +26,3 @@ RUN chown -R django-user:django-user /vol/
 RUN chown -R 755 /vol/web/
 
 USER django-user
-
-CMD ["sh", "-c", "python -m debugpy --wait-for-client --listen 0.0.0.0:5678 -m celery -A tasks worker -l info -P eventlet"]
